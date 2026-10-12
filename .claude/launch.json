@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "seta-varese-preview",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["/Users/veronicafemminino/Claude_Output/Seta_Varese/.claude/dev.sh"],
+      "port": 8090,
+      "autoPort": true
+    }
+  ]
+}

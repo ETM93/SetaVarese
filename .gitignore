@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.output/
+.vinxi/
+.wrangler/
+.tanstack/
+*.log
+.DS_Store
+*.zip
