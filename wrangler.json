@@ -1,3 +1,7 @@
 {
-  "name": "seta-beauty-varese"
+  "name": "seta-beauty-varese",
+  "routes": [
+    { "pattern": "setavarese.beauty", "custom_domain": true },
+    { "pattern": "www.setavarese.beauty", "custom_domain": true }
+  ]
 }
