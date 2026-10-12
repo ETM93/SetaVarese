@@ -8,10 +8,15 @@ import { CENTER } from "@/lib/center";
 
 const WHATSAPP_URL = CENTER.whatsappUrl;
 
+// Opens a chat with the center with the form data prefilled. Must run synchronously
+// inside the submit handler, otherwise browsers block it as a popup.
+function openWhatsApp(text: string) {
+  window.open(`https://wa.me/${CENTER.whatsapp}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+}
+
 export const INTEREST_KEYS = ["laser", "viso", "corpo"] as const;
 export type Interest = (typeof INTEREST_KEYS)[number];
 
-const WEB3FORMS_KEY = "94f106e6-1aee-4100-b0e7-570922ffbbbe";
 const PRIVACY_URL = "/privacy";
 
 export const contactSchema = z.object({
@@ -99,9 +104,8 @@ export function BookingForm({
   defaultNotes?: string;
 } = {}) {
   const navigate = useNavigate();
-  const { t, lang } = useLang();
-  const [status, setStatus] = useState<"idle" | "sending" | "ok" | "err">("idle");
-  const [submitError, setSubmitError] = useState<string>("");
+  const { t } = useLang();
+  const [, setStatus] = useState<"idle" | "ok" | "err">("idle");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [interest, setInterest] = useState<Interest>(preset ?? "laser");
   useEffect(() => {
@@ -114,7 +118,7 @@ export function BookingForm({
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
   }
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const parsed = contactSchema.safeParse({
@@ -139,37 +143,24 @@ export function BookingForm({
       return;
     }
     setErrors({});
-    setSubmitError("");
-    setStatus("sending");
     const d = parsed.data;
     const it = COPY.it;
-    const interestLabel = it.form.interests[d.interest];
-    try {
-      const res = await fetch("https://api.web3forms.com/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          access_key: WEB3FORMS_KEY,
-          subject: `Nuova richiesta appuntamento — ${interestLabel}`,
-          from_name: `Seta Beauty Varese — ${d.name}`,
-          nome: d.name,
-          telefono: d.phone,
-          email: d.email,
-          interesse: interestLabel,
-          giorni: (d.days ?? []).map((i) => it.form.days[i]).join(", ") || "—",
-          fasce_orarie: (d.slots ?? []).map((i) => it.form.slots[i]).join(", ") || "—",
-          note: d.notes || "—",
-          lingua: lang,
-        }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.success) throw new Error(json.message || "Errore invio");
-      setStatus("ok");
-      navigate({ to: "/grazie" });
-    } catch {
-      setStatus("err");
-      setSubmitError(t.form.submitError);
-    }
+    const giorni = (d.days ?? []).map((i) => it.form.days[i]).join(", ");
+    const fasce = (d.slots ?? []).map((i) => it.form.slots[i]).join(", ");
+    const waText = [
+      `Ciao, sono ${d.name} e vorrei essere ricontattato/a.`,
+      `Interesse: ${it.form.interests[d.interest]}`,
+      giorni && `Giorni preferiti: ${giorni}`,
+      fasce && `Fasce orarie: ${fasce}`,
+      `Telefono: ${d.phone}`,
+      `Email: ${d.email}`,
+      d.notes && `Note: ${d.notes}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    openWhatsApp(waText);
+    setStatus("ok");
+    navigate({ to: "/grazie" });
   }
 
   const formCls = dark
@@ -291,14 +282,9 @@ export function BookingForm({
           {errors.notes && <p className="text-xs text-red-400 mt-1.5">{errors.notes}</p>}
         </div>
       </div>
-      <Button type="submit" disabled={status === "sending"} size="lg" className="w-full min-h-12 text-base">
-        {status === "sending" ? t.form.sending : t.form.submit}
+      <Button type="submit" size="lg" className="w-full min-h-12 text-base">
+        {t.form.submit}
       </Button>
-      {status === "err" && submitError && (
-        <p role="alert" className="text-sm text-center text-red-400">
-          {submitError}
-        </p>
-      )}
 
       <div>
         <label htmlFor={`${formId}-privacy`} className={`flex items-start gap-2.5 text-xs leading-relaxed cursor-pointer ${dark ? "text-white/70" : "text-black/60"}`}>
@@ -328,13 +314,12 @@ export { Phone, Mail, WhatsAppIcon };
 
 export function PromoForm({ promo, formId = "promo" }: { promo: PromoKey; formId?: string }) {
   const navigate = useNavigate();
-  const { t, lang } = useLang();
-  const [status, setStatus] = useState<"idle" | "sending" | "ok" | "err">("idle");
-  const [submitError, setSubmitError] = useState("");
+  const { t } = useLang();
+  const [, setStatus] = useState<"idle" | "ok" | "err">("idle");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const promoName = t.promoForm.names[promo];
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const parsed = promoSchema.safeParse({
@@ -355,32 +340,17 @@ export function PromoForm({ promo, formId = "promo" }: { promo: PromoKey; formId
       return;
     }
     setErrors({});
-    setSubmitError("");
-    setStatus("sending");
     const data = parsed.data;
-    try {
-      const response = await fetch("https://api.web3forms.com/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          access_key: WEB3FORMS_KEY,
-          subject: `Richiesta promo — ${promoName}`,
-          from_name: `Seta Beauty Varese — ${data.name}`,
-          nome: data.name,
-          email: data.email,
-          promo: promoName,
-          note: data.notes || "—",
-          lingua: lang,
-        }),
-      });
-      const json = await response.json().catch(() => ({}));
-      if (!response.ok || !json.success) throw new Error(json.message || "Errore invio");
-      setStatus("ok");
-      navigate({ to: "/grazie" });
-    } catch {
-      setStatus("err");
-      setSubmitError(t.form.submitError);
-    }
+    const waText = [
+      `Ciao, sono ${data.name} e vorrei bloccare la promo "${COPY.it.promoForm.names[promo]}".`,
+      `Email: ${data.email}`,
+      data.notes && `Note: ${data.notes}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    openWhatsApp(waText);
+    setStatus("ok");
+    navigate({ to: "/grazie" });
   }
 
   const legendCls = "block text-[11px] font-semibold tracking-[0.18em] uppercase mb-2 text-white/80";
@@ -414,10 +384,9 @@ export function PromoForm({ promo, formId = "promo" }: { promo: PromoKey; formId
         />
         {errors.notes && <p className="text-xs text-red-400 mt-1.5">{errors.notes}</p>}
       </div>
-      <Button type="submit" disabled={status === "sending"} size="lg" className="w-full min-h-12 text-base">
-        {status === "sending" ? t.form.sending : t.promoForm.submit}
+      <Button type="submit" size="lg" className="w-full min-h-12 text-base">
+        {t.promoForm.submit}
       </Button>
-      {status === "err" && submitError && <p role="alert" className="text-sm text-center text-red-400">{submitError}</p>}
       <div>
         <label htmlFor={`${formId}-privacy`} className="flex items-start gap-2.5 text-xs leading-relaxed cursor-pointer text-white/70">
           <input id={`${formId}-privacy`} name="privacy" type="checkbox" required className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--seta-teal)] cursor-pointer" />
